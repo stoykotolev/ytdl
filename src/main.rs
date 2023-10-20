@@ -54,10 +54,7 @@ fn main() {
 
     let args = vec![
         Arg::new("--progress"),
-        Arg::new_with_arg(
-            "-f",
-            "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
-        ),
+        Arg::new_with_arg("-f", "best"),
         Arg::new_with_arg("-o", &file_name),
     ];
 
