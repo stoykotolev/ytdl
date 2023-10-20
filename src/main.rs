@@ -39,7 +39,11 @@ impl URL {
 
 fn main() {
     let user_args: YTDLArguments = YTDLArguments::parse();
-    let path = PathBuf::from("./download");
+    let mut path = PathBuf::from("/Users/stoykotolev/Documents/youtube/");
+    match user_args.directory {
+        Some(directory) => path.push(directory),
+        None => {}
+    }
     let file_name = format!(
         "{}.mp4",
         user_args.file_name.unwrap_or("video-lul".to_owned())
