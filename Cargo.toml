@@ -9,4 +9,5 @@ edition = "2021"
 [dependencies]
 clap = { version = "4.3.23", features = ["derive"] }
 ytd-rs = {version = "0.1.7", features = ["yt-dlp"] }
+thiserror = "1.0.24"
 url = "2.4.1"

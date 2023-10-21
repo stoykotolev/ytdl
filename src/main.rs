@@ -1,8 +1,17 @@
 use std::{path::PathBuf, process};
 
 use clap::Parser;
-use url::{ParseError, Url};
+use thiserror::Error;
+use url::Url;
 use ytd_rs::{Arg, YoutubeDL};
+
+#[derive(Error, Debug)]
+enum YTDLError {
+    #[error("Failed parsing url: {0}")]
+    URLParseError(String),
+}
+
+type YTDLResult<T> = std::result::Result<T, YTDLError>;
 
 #[derive(Debug, Parser)]
 #[command(
@@ -24,58 +33,84 @@ struct YTDLArguments {
     url: String,
 }
 struct URL {
-    url: Result<String, ParseError>,
+    url: String,
 }
 
 impl URL {
-    fn new(new_url: String) -> Self {
+    fn new(new_url: String) -> YTDLResult<URL> {
         let url = match Url::parse(&new_url) {
-            Ok(parsed_url) => Ok(parsed_url.as_str().to_owned()),
-            Err(err) => Err(err),
+            Ok(parsed_url) => parsed_url.as_str().to_owned(),
+            Err(err) => {
+                return Err(YTDLError::URLParseError(err.to_string()));
+            }
         };
-        Self { url }
+        Ok(URL { url })
+    }
+}
+
+struct YTDL {
+    directory: PathBuf,
+    arguments: Vec<Arg>,
+    url: String,
+}
+
+impl YTDL {
+    fn build(user_arguments: YTDLArguments) -> YTDL {
+        let mut path = PathBuf::from("/Users/stoykotolev/Documents/youtube/");
+        if let Some(directory) = user_arguments.directory {
+            path.push(directory)
+        };
+
+        let file_name = format!(
+            "{}.mp4",
+            user_arguments.file_name.unwrap_or("video-lul".to_owned())
+        );
+
+        let args = vec![
+            Arg::new("--progress"),
+            Arg::new_with_arg("-f", "best"),
+            Arg::new_with_arg("-o", &file_name),
+        ];
+
+        let url = match URL::new(user_arguments.url) {
+            Ok(url) => url,
+            Err(err) => {
+                eprintln!("{:?}", err);
+                process::exit(1);
+            }
+        };
+
+        YTDL {
+            directory: path,
+            arguments: args,
+            url: url.url,
+        }
+    }
+
+    fn init_client(&self) -> YoutubeDL {
+        let ytd = match YoutubeDL::new(&self.directory, self.arguments.clone(), &self.url) {
+            Ok(ytd) => ytd,
+            Err(err) => {
+                eprintln!("Failed initializing download: {}", err.to_string());
+                process::exit(1);
+            }
+        };
+
+        eprintln!("Started download of video.");
+        ytd
     }
 }
 
 fn main() {
     let user_args: YTDLArguments = YTDLArguments::parse();
-    let mut path = PathBuf::from("/Users/stoykotolev/Documents/youtube/");
-    match user_args.directory {
-        Some(directory) => path.push(directory),
-        None => {}
-    }
-    let file_name = format!(
-        "{}.mp4",
-        user_args.file_name.unwrap_or("video-lul".to_owned())
-    );
-    let url = match URL::new(user_args.url).url {
-        Ok(url) => url,
-        Err(err) => {
-            eprintln!("Failed parsing url: {:?}", err.to_string());
-            process::exit(0)
-        }
-    };
 
-    let args = vec![
-        Arg::new("--progress"),
-        Arg::new_with_arg("-f", "best"),
-        Arg::new_with_arg("-o", &file_name),
-    ];
+    let ytdl = YTDL::build(user_args).init_client().download();
 
-    eprintln!("Started download of video.");
-    let ytd = match YoutubeDL::new(&path, args, &url) {
-        Ok(ytd) => ytd,
+    let download = match ytdl {
+        Ok(result) => result,
         Err(err) => {
-            eprintln!("fek. {:?}", err);
-            return;
-        }
-    };
-
-    let download = match ytd.download() {
-        Ok(resu) => resu,
-        Err(err) => {
-            eprintln!("fek download. {:?}", err);
-            return;
+            eprintln!("Failed download: {}", err.to_string());
+            process::exit(1);
         }
     };
 

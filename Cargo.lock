@@ -360,6 +360,7 @@ name = "ytdl"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "thiserror",
  "url",
  "ytd-rs",
 ]
